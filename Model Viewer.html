@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP2000 Enhanced Ultimate Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow: hidden; 
+            background: #1a1a1a;
+        }
+        #canvas-container { 
+            width: 100vw; 
+            height: 100vh; 
+            cursor: default;
+        }
+        #canvas-container.pan-mode { cursor: grab; }
+        #canvas-container.pan-mode:active { cursor: grabbing; }
+        #canvas-container.rotate-mode { cursor: move; }
+        #canvas-container.select-mode { cursor: crosshair; }
+        #canvas-container.measure-mode { cursor: crosshair; }
+        
+        #info-panel {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); min-width: 320px; max-width: 400px;
+            display: none; max-height: 80vh; overflow-y: auto; z-index: 100;
+        }
+        #info-panel h3 { 
+            margin: 0 0 15px 0; color: #2c3e50; 
+            border-bottom: 2px solid #3498db; padding-bottom: 8px; 
+        }
+        #info-panel .info-item { margin: 8px 0; line-height: 1.5; font-size: 15px; }
+        #info-panel .label { 
+            font-weight: 600; color: #34495e; 
+            display: inline-block; width: 140px; 
+        }
+        #info-panel .value { 
+            color: #2c3e50; 
+            font-family: 'Courier New', monospace; 
+            font-size: 15px; 
+        }
+        #info-panel .close-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: #e74c3c; color: white; border: none;
+            width: 25px; height: 25px; border-radius: 50%;
+            cursor: pointer; font-weight: bold;
+        }
+        
+        .totals-section {
+            background: #e8f5e9;
+            border-left: 4px solid #27ae60;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .totals-section .total-item {
+            font-size: 13px;
+            margin: 5px 0;
+            font-weight: 600;
+            color: #27ae60;
+        }
+        
+        #controls {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); max-width: 360px;
+            max-height: 90vh; overflow-y: auto; z-index: 100;
+        }
+        #controls::-webkit-scrollbar { width: 8px; }
+        #controls::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        #controls::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        #controls::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        #controls h4 { 
+            margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;
+            cursor: pointer; user-select: none;
+        }
+        #controls h4:hover { color: #3498db; }
+        #controls p { margin: 5px 0; font-size: 12px; color: #555; }
+        
+        .control-section {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .control-section h5 {
+            margin: 0 0 8px 0;
+            color: #2c3e50;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+        }
+        .control-section h5:hover {
+            color: #3498db;
+        }
+        .control-section h5 .arrow {
+            margin-left: auto;
+            font-size: 10px;
+            transition: transform 0.3s;
+        }
+        .control-section h5 .arrow.open {
+            transform: rotate(90deg);
+        }
+        
+        .button {
+            background: #3498db; color: white; border: none; padding: 8px 15px;
+            border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0;
+            font-size: 13px; transition: all 0.3s;
+        }
+        .button:hover { background: #2980b9; transform: translateY(-1px); }
+        .button.active { background: #27ae60; }
+        .button.small { padding: 5px 10px; font-size: 11px; }
+        .button.info { background: #9b59b6; }
+        .button.info:hover { background: #8e44ad; }
+        
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-container label {
+            display: block;
+            font-size: 12px;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .slider-container input[type="range"] {
+            width: 100%;
+        }
+        .slider-value {
+            display: inline-block;
+            min-width: 50px;
+            text-align: right;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .color-picker-row {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+        .color-picker-row label {
+            flex: 1;
+            font-size: 12px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .color-picker-row input[type="color"] {
+            width: 50px;
+            height: 30px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .filter-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            margin: 3px 0;
+            background: white;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .filter-item input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .filter-item label {
+            flex: 1;
+            cursor: pointer;
+            user-select: none;
+        }
+        .filter-count {
+            color: #7f8c8d;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        
+        .filter-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .filter-list::-webkit-scrollbar { width: 6px; }
+        .filter-list::-webkit-scrollbar-track { background: #f1f1f1; }
+        .filter-list::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        
+        #file-input-container {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 15px 25px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); z-index: 100;
+        }
+        #file-input { display: none; }
+        .file-label {
+            background: #27ae60; color: white; padding: 10px 20px; border-radius: 4px;
+            cursor: pointer; display: inline-block; font-weight: 500;
+        }
+        .file-label:hover { background: #229954; }
+        
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95); padding: 30px 50px; border-radius: 8px;
+            display: none; text-align: center; font-size: 18px; color: #2c3e50; z-index: 200;
+        }
+        
+        #selection-box {
+            position: absolute;
+            border: 2px dashed #3498db;
+            background: rgba(52, 152, 219, 0.1);
+            pointer-events: none;
+            display: none;
+            z-index: 50;
+        }
+        
+        #distance-display {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(52, 152, 219, 0.95); color: white; 
+            padding: 15px 30px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); display: none;
+            font-size: 18px; font-weight: bold; z-index: 100;
+        }
+        
+        #total-weight-display {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(155, 89, 182, 0.95); color: white; 
+            padding: 15px 25px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); display: none;
+            font-size: 16px; font-weight: bold; z-index: 100;
+        }
+        
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .collapsible-content.open {
+            max-height: 3000px;
+        }
+        
+        .clip-plane-header {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        .clip-plane-header input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .clip-plane-header label {
+            min-width: 40px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .clip-plane-header .flip-checkbox {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+        .clip-plane-header .flip-checkbox input {
+            margin: 0 4px;
+        }
+        
+        .measure-info {
+            background: #e8f5e9;
+            border-left: 4px solid #27ae60;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #2c3e50;
+        }
+        
+        .subsection-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .subsection-content.open {
+            max-height: 500px;
+        }
+        
+        .design-data-section {
+            margin-top: 15px;
+            border-top: 2px solid #e0e0e0;
+            padding-top: 10px;
+        }
+        .design-data-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: #f0f8ff;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .design-data-header:hover {
+            background: #e3f2fd;
+        }
+        .design-data-header .arrow {
+            margin-left: auto;
+            font-size: 10px;
+            transition: transform 0.3s;
+        }
+        .design-data-header .arrow.open {
+            transform: rotate(90deg);
+        }
+        .design-data-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .design-data-content.open {
+            max-height: 1000px;
+        }
+        .design-group {
+            margin: 10px 0;
+            padding: 8px;
+            background: #f9f9f9;
+            border-left: 3px solid #3498db;
+            border-radius: 3px;
+        }
+        .design-group-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .design-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 12px;
+        }
+        .design-item .label {
+            color: #555;
+            font-weight: 500;
+        }
+        .design-item .value {
+            font-family: 'Courier New', monospace;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .design-item .value.critical {
+            color: #e74c3c;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="selection-box"></div>
+    
+    <div id="file-input-container">
+        <label for="file-input" class="file-label">📁 Load SAP2000 MODEL</label>
+        <input type="file" id="file-input" accept=".json">
+    </div>
+
+    <div id="controls">
+        <h4 onclick="toggleControlsPanel()">🎮 Controls & Settings ▼</h4>
+        <div id="controls-content" class="collapsible-content open">
+            <p style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">
+                <strong>Left:</strong> Select | <strong>Middle:</strong> Pan | <strong>Right:</strong> Rotate
+            </p>
+            
+            <div class="control-section">
+                <h5>🎨 View Options</h5>
+                <button class="button active" id="view-mode-btn" onclick="toggleViewMode()">🗂️ 3D Sections</button>
+                <button class="button" id="grid-btn" onclick="toggleGrid()">⊞ Grid</button>
+                <button class="button" id="axes-btn" onclick="toggleAxes()">📊 Axes: ON</button>
+                <button class="button" id="points-btn" onclick="togglePoints()">⚫ Points: ON</button>
+                <button class="button" id="labels-btn" onclick="toggleLabels()">🏷️ Labels: OFF</button>
+            </div>
+            
+            <div class="control-section">
+                <h5>⚙️ Display Settings</h5>
+                <button class="button" id="settings-btn" onclick="toggleSettings()">🎨 Colors & Style</button>
+                <div id="settings-content" class="subsection-content" style="margin-top: 10px;">
+                    <div class="color-picker-row">
+                        <label>Background:</label>
+                        <input type="color" id="bg-color" value="#1a1a1a" onchange="changeBackgroundColor(this.value)">
+                    </div>
+                    <div class="color-picker-row">
+                        <label>Point Color:</label>
+                        <input type="color" id="point-color" value="#ff6b6b" onchange="changePointColor(this.value)">
+                    </div>
+                    <div class="color-picker-row">
+                        <label>Label Color:</label>
+                        <input type="color" id="label-color" value="#ffffff" onchange="changeLabelColor(this.value)">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5>🎨 Color Mode</h5>
+                <button class="button" id="color-mode-btn" onclick="toggleColorMode()">🎨 Profile Colors</button>
+                <p style="font-size: 10px; color: #7f8c8d; margin-top: 5px;">
+                    Switch between unique colors or uniform gray
+                </p>
+            </div>
+            
+            <div class="control-section">
+                <h5>🔍 Zoom Settings</h5>
+                <button class="button active" id="zoom-toggle-btn" onclick="toggleZoom()">🔍 Zoom: ON</button>
+                <div class="slider-container">
+                    <label>
+                        Zoom Speed: <span class="slider-value" id="zoom-speed-value">100%</span>
+                    </label>
+                    <input type="range" min="10" max="500" value="100" id="zoom-speed-slider">
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5>📏 Measure Distance</h5>
+                <button class="button" id="measure-btn" onclick="toggleMeasureMode()">📏 Measure Mode</button>
+                <div class="measure-info" id="measure-info" style="display: none;">
+                    ✓ Measure mode active<br>
+                    Hover on points to highlight, click two points to measure
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5>📊 Project Statistics</h5>
+                <button class="button info" onclick="showTotalWeight()">⚖️ Total Weight</button>
+            </div>
+            
+            <div class="control-section">
+                <h5>🔧 Tools</h5>
+                <button class="button" onclick="resetCamera()">🔄 Reset View</button>
+            </div>
+            
+            <div class="control-section">
+                <h5>✂️ Clipping Planes</h5>
+                <p style="font-size: 10px; color: #7f8c8d; margin-bottom: 8px;">
+                    Cut through model to see inside. Flip reverses direction!
+                </p>
+                
+                <!-- XZ Plane -->
+                <div class="clip-plane-header">
+                    <input type="checkbox" id="clip-xz" onchange="toggleClipPlane('xz')">
+                    <label for="clip-xz">XZ</label>
+                    <span style="font-size: 10px; color: #7f8c8d;">(Y-axis)</span>
+                    <div class="flip-checkbox">
+                        <label for="flip-xz">Flip</label>
+                        <input type="checkbox" id="flip-xz" onchange="flipClipPlane('xz')">
+                    </div>
+                </div>
+                <div class="slider-container" id="clip-xz-slider" style="display: none;">
+                    <label>Y Position: <span class="slider-value" id="clip-xz-value">0.0m</span></label>
+                    <input type="range" min="0" max="100" value="50" id="clip-xz-range" step="0.1">
+                </div>
+                
+                <!-- XY Plane -->
+                <div class="clip-plane-header">
+                    <input type="checkbox" id="clip-xy" onchange="toggleClipPlane('xy')">
+                    <label for="clip-xy">XY</label>
+                    <span style="font-size: 10px; color: #7f8c8d;">(Z-axis)</span>
+                    <div class="flip-checkbox">
+                        <label for="flip-xy">Flip</label>
+                        <input type="checkbox" id="flip-xy" onchange="flipClipPlane('xy')">
+                    </div>
+                </div>
+                <div class="slider-container" id="clip-xy-slider" style="display: none;">
+                    <label>Z Position: <span class="slider-value" id="clip-xy-value">0.0m</span></label>
+                    <input type="range" min="0" max="100" value="50" id="clip-xy-range" step="0.1">
+                </div>
+                
+                <!-- YZ Plane -->
+                <div class="clip-plane-header">
+                    <input type="checkbox" id="clip-yz" onchange="toggleClipPlane('yz')">
+                    <label for="clip-yz">YZ</label>
+                    <span style="font-size: 10px; color: #7f8c8d;">(X-axis)</span>
+                    <div class="flip-checkbox">
+                        <label for="flip-yz">Flip</label>
+                        <input type="checkbox" id="flip-yz" onchange="flipClipPlane('yz')">
+                    </div>
+                </div>
+                <div class="slider-container" id="clip-yz-slider" style="display: none;">
+                    <label>X Position: <span class="slider-value" id="clip-yz-value">0.0m</span></label>
+                    <input type="range" min="0" max="100" value="50" id="clip-yz-range" step="0.1">
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5 onclick="toggleSubsection('profile-filter')">
+                    🔍 Filter by Profile
+                    <span class="arrow open">▶</span>
+                </h5>
+                <div id="profile-filter" class="subsection-content open">
+                    <div style="margin-bottom: 10px;">
+                        <button class="button small" onclick="selectAllProfiles()">All</button>
+                        <button class="button small" onclick="deselectAllProfiles()">None</button>
+                    </div>
+                    <div id="profile-filter-list" class="filter-list"></div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5 onclick="toggleSubsection('group-filter')">
+                    🔍 Filter by Group
+                    <span class="arrow open">▶</span>
+                </h5>
+                <div id="group-filter" class="subsection-content open">
+                    <div style="margin-bottom: 10px;">
+                        <button class="button small" onclick="selectAllGroups()">All</button>
+                        <button class="button small" onclick="deselectAllGroups()">None</button>
+                    </div>
+                    <div id="group-filter-list" class="filter-list"></div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5>⚙️ Selection Settings</h5>
+                <div class="slider-container">
+                    <label>
+                        Pick Tolerance: <span class="slider-value" id="tolerance-value">50</span>
+                    </label>
+                    <input type="range" min="0" max="500" value="50" id="tolerance-slider">
+                    <p style="font-size: 10px; color: #7f8c8d; margin-top: 3px;">
+                        Higher = easier to select thin members
+                    </p>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h5>🎨 Visual Settings</h5>
+                <div class="slider-container">
+                    <label>
+                        Transparency: <span class="slider-value" id="transparency-value">0%</span>
+                    </label>
+                    <input type="range" min="0" max="100" value="0" id="transparency-slider">
+                </div>
+                <div class="slider-container">
+                    <label>
+                        Point Size: <span class="slider-value" id="point-size-value">100</span>
+                    </label>
+                    <input type="range" min="50" max="500" value="100" id="point-size-slider">
+                </div>
+                <div class="slider-container">
+                    <label>
+                        Label Size: <span class="slider-value" id="label-size-value">14</span>
+                    </label>
+                    <input type="range" min="8" max="150" value="14" id="label-size-slider">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-panel">
+        <button class="close-btn" onclick="deselectAll()">✕</button>
+        <h3 id="info-title">Element Info</h3>
+        <div id="info-content"></div>
+    </div>
+
+    <div id="distance-display">
+        📏 Distance: <span id="distance-value">0.000 m</span>
+    </div>
+
+    <div id="total-weight-display">
+        ⚖️ Total Project Weight: <span id="total-weight-value">0.00 kg</span>
+    </div>
+
+    <div id="loading">Loading Model...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Global variables
+        let scene, camera, renderer;
+        let modelData = null;
+        let frameObjects = [];
+        let pointObjects = [];
+        let labelSprites = [];
+        let selectedObjects = [];
+        let hoveredObject = null;
+        let gridHelper, axesHelper;
+        let showAxes = true;
+        
+        const SCALE = 1000;
+        
+        // Control state
+        let isMouseDown = false;
+        let mouseButton = 0;
+        let mouseX = 0, mouseY = 0;
+        let lastMouseX = 0, lastMouseY = 0;
+        let rotationSpeed = 0.005;
+        
+        // Camera
+        let cameraTarget = new THREE.Vector3(0, 0, 0);
+        let cameraDistance = 50000;
+        let cameraTheta = Math.PI / 4;
+        let cameraPhi = Math.PI / 4;
+        
+        // Advanced camera controls
+        let rotationPivot = null;
+        let isRotating = false;
+        
+        // Zoom settings
+        let zoomEnabled = true;
+        let zoomSpeed = 1.0;
+        
+        // View settings
+        let show3DSections = true;
+        let showGrid = true;
+        let showPoints = true;
+        let showLabels = false;
+        let transparency = 0;
+        let pointSize = 100;
+        let labelSize = 14;
+        let pickTolerance = 50;
+        let uniformColorMode = false;
+        const UNIFORM_COLOR = 0xcccccc;
+        const SELECTION_COLOR = 0xffff00;
+        const HOVER_COLOR = 0xff9900;
+        const MEASURE_POINT_HIGHLIGHT = 0x00ff00;
+        
+        // Colors
+        let backgroundColor = 0x1a1a1a;
+        let pointColor = 0xff6b6b;
+        let labelColor = '#ffffff';
+        
+        // Measure mode
+        let measureMode = false;
+        let measurePoints = [];
+        let measureMarkers = [];
+        let measureLine = null;
+        
+        // Box selection
+        let boxSelecting = false;
+        let boxStartX, boxStartY;
+        
+        // Profile colors
+        let profileColorMap = {};
+        const baseColors = [
+            0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6,
+            0x1abc9c, 0xe67e22, 0x34495e, 0x16a085, 0xc0392b,
+            0x27ae60, 0x2980b9, 0x8e44ad, 0xd35400, 0x2c3e50
+        ];
+        let colorIndex = 0;
+
+        // Filters
+        let hiddenProfiles = new Set();
+        let hiddenGroups = new Set();
+        
+        // Clipping planes
+        let modelBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
+        let clipPlanes = {
+            xz: null,
+            xy: null,
+            yz: null
+        };
+        let clipEnabled = {
+            xz: false,
+            xy: false,
+            yz: false
+        };
+        let clipFlipped = {
+            xz: false,
+            xy: false,
+            yz: false
+        };
+
+        function getColorForProfile(profileName) {
+            if (!profileColorMap[profileName]) {
+                profileColorMap[profileName] = baseColors[colorIndex % baseColors.length];
+                colorIndex++;
+            }
+            return profileColorMap[profileName];
+        }
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(backgroundColor);
+            
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000000);
+            updateCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, localClippingEnabled: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100000, 100000, 50000);
+            scene.add(directionalLight);
+            
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            directionalLight2.position.set(-100000, -100000, -50000);
+            scene.add(directionalLight2);
+
+            gridHelper = new THREE.GridHelper(200000, 40, 0x444444, 0x222222);
+            scene.add(gridHelper);
+            
+            axesHelper = new THREE.AxesHelper(20000);
+            scene.add(axesHelper);
+
+            clipPlanes.xz = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            clipPlanes.xy = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            clipPlanes.yz = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+
+            setupControls();
+            setupMouseInteraction();
+            setupHoverDetection();
+            setupUIEvents();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function updateCameraPosition() {
+            camera.position.x = cameraTarget.x + cameraDistance * Math.sin(cameraTheta) * Math.cos(cameraPhi);
+            camera.position.y = cameraTarget.y + cameraDistance * Math.sin(cameraPhi);
+            camera.position.z = cameraTarget.z + cameraDistance * Math.cos(cameraTheta) * Math.cos(cameraPhi);
+            camera.lookAt(cameraTarget);
+        }
+
+        function setupControls() {
+            const canvas = renderer.domElement;
+            const container = document.getElementById('canvas-container');
+
+            canvas.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                mouseButton = e.button;
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+
+                if (mouseButton === 1 || mouseButton === 2) {
+                    e.preventDefault();
+                    container.classList.add(mouseButton === 1 ? 'pan-mode' : 'rotate-mode');
+                    
+                    if (mouseButton === 2) {
+                        const pivot = getPointUnderMouse(e.clientX, e.clientY);
+                        if (pivot) {
+                            rotationPivot = pivot;
+                            isRotating = true;
+                        } else {
+                            rotationPivot = null;
+                            isRotating = false;
+                        }
+                    }
+                } 
+                else if (mouseButton === 0) {
+                    if (measureMode) {
+                        container.classList.add('measure-mode');
+                    } else if (e.ctrlKey) {
+                        boxSelecting = true;
+                        boxStartX = e.clientX;
+                        boxStartY = e.clientY;
+                        const box = document.getElementById('selection-box');
+                        box.style.left = e.clientX + 'px';
+                        box.style.top = e.clientY + 'px';
+                        box.style.width = '0px';
+                        box.style.height = '0px';
+                        box.style.display = 'block';
+                        container.classList.add('select-mode');
+                    }
+                }
+            });
+
+            canvas.addEventListener('mouseup', (e) => {
+                if (boxSelecting) {
+                    boxSelecting = false;
+                    document.getElementById('selection-box').style.display = 'none';
+                    performBoxSelection(boxStartX, boxStartY, e.clientX, e.clientY, true);
+                    container.classList.remove('select-mode');
+                }
+                
+                isMouseDown = false;
+                isRotating = false;
+                rotationPivot = null;
+                container.classList.remove('pan-mode', 'rotate-mode', 'measure-mode');
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isMouseDown) return;
+
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+
+                if (mouseButton === 1) {
+                    const right = new THREE.Vector3();
+                    const up = new THREE.Vector3();
+                    camera.getWorldDirection(right);
+                    right.cross(camera.up).normalize();
+                    up.copy(camera.up).normalize();
+                    
+                    const panScale = cameraDistance * 0.001;
+                    right.multiplyScalar(-deltaX * panScale);
+                    up.multiplyScalar(deltaY * panScale);
+                    
+                    cameraTarget.add(right);
+                    cameraTarget.add(up);
+                    updateCameraPosition();
+                } else if (mouseButton === 2) {
+                    if (isRotating && rotationPivot) {
+                        rotateAroundPivot(deltaX, deltaY, rotationPivot);
+                    } else {
+                        // FREE ROTATION - No limits on phi (vertical angle)
+                        cameraTheta -= deltaX * rotationSpeed;
+                        cameraPhi -= deltaY * rotationSpeed;
+                        // Allow full 360 degree rotation
+                        // cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi));
+                        updateCameraPosition();
+                    }
+                } else if (mouseButton === 0 && boxSelecting) {
+                    const box = document.getElementById('selection-box');
+                    const left = Math.min(boxStartX, e.clientX);
+                    const top = Math.min(boxStartY, e.clientY);
+                    const width = Math.abs(e.clientX - boxStartX);
+                    const height = Math.abs(e.clientY - boxStartY);
+                    box.style.left = left + 'px';
+                    box.style.top = top + 'px';
+                    box.style.width = width + 'px';
+                    box.style.height = height + 'px';
+                }
+            });
+
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            canvas.addEventListener('wheel', (e) => {
+                if (!zoomEnabled) return;
+                e.preventDefault();
+                
+                const zoomTarget = getPointUnderMouse(e.clientX, e.clientY);
+                
+                const effectiveZoomSpeed = 0.1 * zoomSpeed;
+                const delta = e.deltaY > 0 ? 1 + effectiveZoomSpeed : 1 - effectiveZoomSpeed;
+                const oldDistance = cameraDistance;
+                cameraDistance *= delta;
+                cameraDistance = Math.max(10, Math.min(10000000, cameraDistance));
+                
+                if (zoomTarget) {
+                    const zoomFactor = 1 - (cameraDistance / oldDistance);
+                    const directionToTarget = new THREE.Vector3().subVectors(zoomTarget, cameraTarget);
+                    cameraTarget.add(directionToTarget.multiplyScalar(zoomFactor * 0.5));
+                }
+                
+                updateCameraPosition();
+            });
+        }
+
+        function getPointUnderMouse(clientX, clientY) {
+            const mouse = new THREE.Vector2();
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.params.Line.threshold = pickTolerance;
+            
+            const allObjects = [...frameObjects, ...pointObjects];
+            const intersects = raycaster.intersectObjects(allObjects, true);
+
+            if (intersects.length > 0) {
+                return intersects[0].point.clone();
+            }
+            
+            return null;
+        }
+
+        function rotateAroundPivot(deltaX, deltaY, pivot) {
+            // FREE ROTATION around pivot - no angle restrictions
+            const newTheta = cameraTheta - deltaX * rotationSpeed;
+            const newPhi = cameraPhi - deltaY * rotationSpeed;
+            // Remove the angle clamping to allow full rotation
+            // const newPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi - deltaY * rotationSpeed));
+            
+            const currentOffset = new THREE.Vector3().subVectors(camera.position, pivot);
+            const currentDistance = currentOffset.length();
+            
+            const newCameraPos = new THREE.Vector3();
+            newCameraPos.x = pivot.x + currentDistance * Math.sin(newTheta) * Math.cos(newPhi);
+            newCameraPos.y = pivot.y + currentDistance * Math.sin(newPhi);
+            newCameraPos.z = pivot.z + currentDistance * Math.cos(newTheta) * Math.cos(newPhi);
+            
+            camera.position.copy(newCameraPos);
+            camera.lookAt(pivot);
+            
+            cameraTarget.copy(pivot);
+            cameraDistance = currentDistance;
+            cameraTheta = newTheta;
+            cameraPhi = newPhi;
+        }
+
+        function setupHoverDetection() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                if (isMouseDown || boxSelecting) return;
+
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.params.Line.threshold = pickTolerance;
+                
+                if (hoveredObject && !selectedObjects.includes(hoveredObject)) {
+                    resetObjectColor(hoveredObject);
+                }
+                hoveredObject = null;
+
+                if (measureMode) {
+                    raycaster.params.Points = raycaster.params.Points || {};
+                    raycaster.params.Points.threshold = 500;
+                    const intersects = raycaster.intersectObjects(pointObjects, false);
+                    
+                    if (intersects.length > 0) {
+                        let obj = intersects[0].object;
+                        hoveredObject = obj;
+                        if (obj.material) {
+                            obj.material.color.setHex(MEASURE_POINT_HIGHLIGHT);
+                            if (obj.material.emissive) {
+                                obj.material.emissive.setHex(0x003300);
+                            }
+                        }
+                    }
+                } else {
+                    const allObjects = [...frameObjects, ...pointObjects];
+                    const intersects = raycaster.intersectObjects(allObjects, true);
+
+                    if (intersects.length > 0) {
+                        let obj = intersects[0].object;
+                        while (obj.parent && !obj.userData.type) {
+                            obj = obj.parent;
+                        }
+                        
+                        if (!selectedObjects.includes(obj)) {
+                            hoveredObject = obj;
+                            applyHoverEffect(obj);
+                        }
+                    }
+                }
+            });
+        }
+
+        function applyHoverEffect(object) {
+            if (object.traverse) {
+                object.traverse((child) => {
+                    if (child.material) {
+                        child.material.color.setHex(HOVER_COLOR);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x332200);
+                        }
+                    }
+                });
+            } else if (object.material) {
+                object.material.color.setHex(HOVER_COLOR);
+                if (object.material.emissive) {
+                    object.material.emissive.setHex(0x332200);
+                }
+            }
+        }
+
+        function setupMouseInteraction() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('click', (event) => {
+                if (Math.abs(event.clientX - mouseX) > 5 || Math.abs(event.clientY - mouseY) > 5) return;
+                if (event.button !== 0) return;
+                if (boxSelecting) return;
+
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.params.Line.threshold = pickTolerance;
+                const allObjects = [...frameObjects, ...pointObjects];
+                const intersects = raycaster.intersectObjects(allObjects, true);
+
+                if (measureMode) {
+                    handleMeasureClick(intersects);
+                } else {
+                    if (intersects.length > 0) {
+                        let obj = intersects[0].object;
+                        while (obj.parent && !obj.userData.type) {
+                            obj = obj.parent;
+                        }
+                        
+                        if (event.ctrlKey) {
+                            toggleSelection(obj);
+                        } else {
+                            selectSingle(obj);
+                        }
+                    } else if (!event.ctrlKey) {
+                        deselectAll();
+                    }
+                }
+            });
+        }
+
+        function handleMeasureClick(intersects) {
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                measurePoints.push(point.clone());
+
+                const markerGeometry = new THREE.SphereGeometry(300, 16, 16);
+                const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.copy(point);
+                scene.add(marker);
+                measureMarkers.push(marker);
+
+                if (measurePoints.length === 2) {
+                    const p1 = measurePoints[0];
+                    const p2 = measurePoints[1];
+                    const distance = p1.distanceTo(p2) / SCALE;
+
+                    if (measureLine) scene.remove(measureLine);
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 3 });
+                    measureLine = new THREE.Line(lineGeometry, lineMaterial);
+                    scene.add(measureLine);
+
+                    document.getElementById('distance-value').textContent = distance.toFixed(3) + ' m';
+                    document.getElementById('distance-display').style.display = 'block';
+
+                    setTimeout(() => {
+                        measurePoints = [];
+                        measureMarkers.forEach(m => scene.remove(m));
+                        measureMarkers = [];
+                        if (measureLine) {
+                            scene.remove(measureLine);
+                            measureLine = null;
+                        }
+                        document.getElementById('distance-display').style.display = 'none';
+                    }, 5000);
+                }
+            }
+        }
+
+        function performBoxSelection(x1, y1, x2, y2, addToSelection) {
+            const left = Math.min(x1, x2);
+            const right = Math.max(x1, x2);
+            const top = Math.min(y1, y2);
+            const bottom = Math.max(y1, y2);
+
+            const selected = [];
+            
+            [...frameObjects, ...pointObjects].forEach(obj => {
+                const box = new THREE.Box3().setFromObject(obj);
+                const center = box.getCenter(new THREE.Vector3());
+                const screenPos = center.clone().project(camera);
+                
+                const x = (screenPos.x + 1) / 2 * window.innerWidth;
+                const y = (-screenPos.y + 1) / 2 * window.innerHeight;
+                
+                if (x >= left && x <= right && y >= top && y <= bottom) {
+                    selected.push(obj);
+                }
+            });
+
+            if (!addToSelection) {
+                selectedObjects.forEach(obj => resetObjectColor(obj));
+                selectedObjects = [];
+            }
+
+            selected.forEach(obj => {
+                if (!selectedObjects.includes(obj)) {
+                    selectedObjects.push(obj);
+                    highlightObject(obj);
+                }
+            });
+
+            updateInfoPanel();
+        }
+
+        function selectSingle(object) {
+            selectedObjects.forEach(obj => resetObjectColor(obj));
+            selectedObjects = [object];
+            highlightObject(object);
+            updateInfoPanel();
+        }
+
+        function toggleSelection(object) {
+            const index = selectedObjects.indexOf(object);
+            if (index > -1) {
+                selectedObjects.splice(index, 1);
+                resetObjectColor(object);
+            } else {
+                selectedObjects.push(object);
+                highlightObject(object);
+            }
+            updateInfoPanel();
+        }
+
+        function resetObjectColor(object) {
+            if (object.traverse) {
+                object.traverse((child) => {
+                    if (child.material) {
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x000000);
+                        }
+                        if (child.userData.originalColor !== undefined) {
+                            const displayColor = uniformColorMode ? UNIFORM_COLOR : child.userData.originalColor;
+                            child.material.color.setHex(displayColor);
+                        }
+                    }
+                });
+            } else if (object.material) {
+                if (object.material.emissive) {
+                    object.material.emissive.setHex(0x000000);
+                }
+                if (object.userData.originalColor !== undefined) {
+                    const displayColor = uniformColorMode ? UNIFORM_COLOR : object.userData.originalColor;
+                    object.material.color.setHex(displayColor);
+                }
+            }
+        }
+
+        function highlightObject(object) {
+            if (object.traverse) {
+                object.traverse((child) => {
+                    if (child.material) {
+                        child.material.color.setHex(SELECTION_COLOR);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x555500);
+                        }
+                    }
+                });
+            } else if (object.material) {
+                object.material.color.setHex(SELECTION_COLOR);
+                if (object.material.emissive) {
+                    object.material.emissive.setHex(0x555500);
+                }
+            }
+        }
+
+        function deselectAll() {
+            selectedObjects.forEach(obj => resetObjectColor(obj));
+            selectedObjects = [];
+            document.getElementById('info-panel').style.display = 'none';
+        }
+
+        function updateInfoPanel() {
+            const panel = document.getElementById('info-panel');
+            const content = document.getElementById('info-content');
+            const title = document.getElementById('info-title');
+
+            if (selectedObjects.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            if (selectedObjects.length === 1) {
+                const userData = selectedObjects[0].userData;
+                
+                if (userData.type === 'frame') {
+                    title.textContent = 'Frame Element';
+                    let html = `
+                        <div class="info-item">
+                            <span class="label">Name:</span>
+                            <span class="value">${userData.name}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Profile:</span>
+                            <span class="value">${userData.profile}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Group:</span>
+                            <span class="value">${userData.group || 'All'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Section Type:</span>
+                            <span class="value">${userData.sectionType || 'N/A'}</span>
+                        </div>
+                        ${userData.isNonPrismatic ? '<div class="info-item"><span class="label">Type:</span><span class="value" style="color: #e67e22;">Non-Prismatic</span></div>' : ''}
+                        <div class="info-item">
+                            <span class="label">Length:</span>
+                            <span class="value">${userData.length.toFixed(3)} m</span>
+                        </div>
+                    `;
+                    
+                    // Add weight right after length
+                    if (userData.designData && !isNaN(userData.designData.KgTotal)) {
+                        html += `
+                            <div class="info-item">
+                                <span class="label">Weight:</span>
+                                <span class="value" style="color: #9b59b6; font-weight: 700;">${userData.designData.KgTotal.toFixed(3)} kg</span>
+                            </div>
+                        `;
+                    }
+                    
+                    // Add Design Data Section (Collapsible)
+                    if (userData.designData) {
+                        const dd = userData.designData;
+                        const codeType = dd.ASD === 1 ? 'LRFD' : 'ASD';
+                        const status = dd.Status === 'C' ? 'Column' : 'Beam';
+                        
+                        html += `
+                            <div class="design-data-section">
+                                <div class="design-data-header" onclick="toggleDesignData()">
+                                    <span>📊 Design Data</span>
+                                    <span class="arrow">▶</span>
+                                </div>
+                                <div id="design-data-content" class="design-data-content">
+                                    
+                                    <!-- General Info -->
+                                    <div class="design-group">
+                                        <div class="design-group-title">⚙️ General</div>
+                                        <div class="design-item">
+                                            <span class="label">Status:</span>
+                                            <span class="value">${status}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Material:</span>
+                                            <span class="value">${dd.Material || 'N/A'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Code:</span>
+                                            <span class="value">${dd.CodeName || 'N/A'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Code Type:</span>
+                                            <span class="value">${codeType}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Fy:</span>
+                                            <span class="value">${isNaN(dd.Fy) ? 'N/A' : dd.Fy.toFixed(2) + ' t/m²'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Weight -->
+                                    <div class="design-group">
+                                        <div class="design-group-title">⚖️ Weight Details</div>
+                                        <div class="design-item">
+                                            <span class="label">Weight/m:</span>
+                                            <span class="value">${isNaN(dd.KgPerM) ? 'N/A' : dd.KgPerM.toFixed(3) + ' kg/m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Total Weight:</span>
+                                            <span class="value">${isNaN(dd.KgTotal) ? 'N/A' : dd.KgTotal.toFixed(3) + ' kg'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Design Check -->
+                                    <div class="design-group">
+                                        <div class="design-group-title">✓ Design Check</div>
+                                        <div class="design-item">
+                                            <span class="label">Ratio:</span>
+                                            <span class="value critical">${isNaN(dd.Ratio) ? 'N/A' : dd.Ratio.toFixed(3)}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Combo:</span>
+                                            <span class="value">${dd.RatioCombo || 'N/A'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Station:</span>
+                                            <span class="value">${isNaN(dd.Station) ? 'N/A' : dd.Station.toFixed(3) + ' m'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Forces @ Critical -->
+                                    <div class="design-group">
+                                        <div class="design-group-title">💪 Forces @ Critical Section</div>
+                                        <div class="design-item">
+                                            <span class="label">Mx:</span>
+                                            <span class="value">${isNaN(dd.Mx) ? 'N/A' : dd.Mx.toFixed(2) + ' t·m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">My:</span>
+                                            <span class="value">${isNaN(dd.My) ? 'N/A' : dd.My.toFixed(2) + ' t·m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Q:</span>
+                                            <span class="value">${isNaN(dd.Q) ? 'N/A' : dd.Q.toFixed(2) + ' t'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">N:</span>
+                                            <span class="value">${isNaN(dd.N) ? 'N/A' : dd.N.toFixed(2) + ' t'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Forces @ Opposite End -->
+                                    ${(!isNaN(dd.Mx2) || !isNaN(dd.My2)) ? `
+                                    <div class="design-group">
+                                        <div class="design-group-title">💪 Forces @ Opposite End</div>
+                                        <div class="design-item">
+                                            <span class="label">Mx2:</span>
+                                            <span class="value">${isNaN(dd.Mx2) ? 'N/A' : dd.Mx2.toFixed(2) + ' t·m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">My2:</span>
+                                            <span class="value">${isNaN(dd.My2) ? 'N/A' : dd.My2.toFixed(2) + ' t·m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Q2:</span>
+                                            <span class="value">${isNaN(dd.Q2) ? 'N/A' : dd.Q2.toFixed(2) + ' t'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">N2:</span>
+                                            <span class="value">${isNaN(dd.N2) ? 'N/A' : dd.N2.toFixed(2) + ' t'}</span>
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                    
+                                    <!-- Buckling Lengths -->
+                                    <div class="design-group">
+                                        <div class="design-group-title">📏 Buckling Lengths</div>
+                                        <div class="design-item">
+                                            <span class="label">KLX:</span>
+                                            <span class="value">${isNaN(dd.KLX) ? 'N/A' : dd.KLX.toFixed(2) + ' m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">KLY:</span>
+                                            <span class="value">${isNaN(dd.KLY) ? 'N/A' : dd.KLY.toFixed(2) + ' m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Lb:</span>
+                                            <span class="value">${isNaN(dd.Lb) ? 'N/A' : dd.Lb.toFixed(2) + ' m'}</span>
+                                        </div>
+                                        <div class="design-item">
+                                            <span class="label">Cb:</span>
+                                            <span class="value">${isNaN(dd.Cb) ? 'N/A' : dd.Cb.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    content.innerHTML = html;
+                } else if (userData.type === 'point') {
+                    title.textContent = 'Point Element';
+                    content.innerHTML = `
+                        <div class="info-item">
+                            <span class="label">Name:</span>
+                            <span class="value">${userData.name}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Coordinates:</span>
+                            <span class="value">X: ${userData.x.toFixed(3)}m<br>
+                            Y: ${userData.y.toFixed(3)}m<br>
+                            Z: ${userData.z.toFixed(3)}m</span>
+                        </div>
+                    `;
+                }
+            } else {
+                title.textContent = `Multiple Selection (${selectedObjects.length})`;
+                const frames = selectedObjects.filter(o => o.userData.type === 'frame');
+                const points = selectedObjects.filter(o => o.userData.type === 'point');
+                
+                // Calculate total weight and length
+                let totalWeight = 0;
+                let totalLength = 0;
+                frames.forEach(frame => {
+                    if (frame.userData.length) {
+                        totalLength += frame.userData.length;
+                    }
+                    if (frame.userData.designData && !isNaN(frame.userData.designData.KgTotal)) {
+                        totalWeight += frame.userData.designData.KgTotal;
+                    }
+                });
+                
+                content.innerHTML = `
+                    <div class="info-item">
+                        <span class="label">Frames:</span>
+                        <span class="value">${frames.length}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Points:</span>
+                        <span class="value">${points.length}</span>
+                    </div>
+                    <div class="totals-section">
+                        <div class="total-item">
+                            📏 Total Length: ${totalLength.toFixed(3)} m
+                        </div>
+                        <div class="total-item">
+                            ⚖️ Total Weight: ${totalWeight.toFixed(2)} kg
+                        </div>
+                    </div>
+                `;
+            }
+
+            panel.style.display = 'block';
+        }
+        
+        function toggleDesignData() {
+            const content = document.getElementById('design-data-content');
+            const arrow = document.querySelector('.design-data-header .arrow');
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        function setupUIEvents() {
+            document.getElementById('transparency-slider').addEventListener('input', (e) => {
+                transparency = parseInt(e.target.value);
+                document.getElementById('transparency-value').textContent = transparency + '%';
+                updateTransparency();
+            });
+
+            document.getElementById('point-size-slider').addEventListener('input', (e) => {
+                pointSize = parseInt(e.target.value);
+                document.getElementById('point-size-value').textContent = pointSize;
+                updatePointSize();
+            });
+
+            document.getElementById('label-size-slider').addEventListener('input', (e) => {
+                labelSize = parseInt(e.target.value);
+                document.getElementById('label-size-value').textContent = labelSize;
+                updateLabelSize();
+            });
+
+            document.getElementById('tolerance-slider').addEventListener('input', (e) => {
+                pickTolerance = parseInt(e.target.value);
+                document.getElementById('tolerance-value').textContent = pickTolerance;
+            });
+
+            document.getElementById('zoom-speed-slider').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                zoomSpeed = value / 100;
+                document.getElementById('zoom-speed-value').textContent = value + '%';
+            });
+
+            document.getElementById('clip-xz-range').addEventListener('input', (e) => {
+                updateClipPlanePosition('xz', e.target.value);
+            });
+
+            document.getElementById('clip-xy-range').addEventListener('input', (e) => {
+                updateClipPlanePosition('xy', e.target.value);
+            });
+
+            document.getElementById('clip-yz-range').addEventListener('input', (e) => {
+                updateClipPlanePosition('yz', e.target.value);
+            });
+
+            document.getElementById('file-input').addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                document.getElementById('loading').style.display = 'block';
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        modelData = JSON.parse(e.target.result);
+                        loadModel(modelData);
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('file-input-container').style.display = 'none';
+                    } catch (error) {
+                        alert('Error loading JSON: ' + error.message);
+                        document.getElementById('loading').style.display = 'none';
+                    }
+                };
+
+                reader.readAsText(file);
+            });
+        }
+
+        function toggleClipPlane(plane) {
+            clipEnabled[plane] = document.getElementById(`clip-${plane}`).checked;
+            document.getElementById(`clip-${plane}-slider`).style.display = clipEnabled[plane] ? 'block' : 'none';
+            updateClippingPlanes();
+        }
+
+        function flipClipPlane(plane) {
+            clipFlipped[plane] = document.getElementById(`flip-${plane}`).checked;
+            
+            if (plane === 'xz') {
+                clipPlanes.xz.normal.set(0, clipFlipped.xz ? -1 : 1, 0);
+            } else if (plane === 'xy') {
+                clipPlanes.xy.normal.set(0, 0, clipFlipped.xy ? -1 : 1);
+            } else if (plane === 'yz') {
+                clipPlanes.yz.normal.set(clipFlipped.yz ? -1 : 1, 0, 0);
+            }
+            
+            updateClippingPlanes();
+        }
+
+        function updateClipPlanePosition(plane, sliderValue) {
+            const value = parseFloat(sliderValue) / 100;
+            
+            if (plane === 'xz') {
+                const yPos = modelBounds.minY + value * (modelBounds.maxY - modelBounds.minY);
+                clipPlanes.xz.constant = clipFlipped.xz ? yPos : -yPos;
+                document.getElementById('clip-xz-value').textContent = (yPos / SCALE).toFixed(2) + 'm';
+            } else if (plane === 'xy') {
+                const zPos = modelBounds.minZ + value * (modelBounds.maxZ - modelBounds.minZ);
+                clipPlanes.xy.constant = clipFlipped.xy ? zPos : -zPos;
+                document.getElementById('clip-xy-value').textContent = (zPos / SCALE).toFixed(2) + 'm';
+            } else if (plane === 'yz') {
+                const xPos = modelBounds.minX + value * (modelBounds.maxX - modelBounds.minX);
+                clipPlanes.yz.constant = clipFlipped.yz ? xPos : -xPos;
+                document.getElementById('clip-yz-value').textContent = (xPos / SCALE).toFixed(2) + 'm';
+            }
+        }
+
+        function updateClippingPlanes() {
+            const activePlanes = [];
+            if (clipEnabled.xz) activePlanes.push(clipPlanes.xz);
+            if (clipEnabled.xy) activePlanes.push(clipPlanes.xy);
+            if (clipEnabled.yz) activePlanes.push(clipPlanes.yz);
+
+            frameObjects.forEach(obj => {
+                obj.traverse((child) => {
+                    if (child.material) {
+                        child.material.clippingPlanes = activePlanes;
+                        child.material.clipShadows = true;
+                        child.material.needsUpdate = true;
+                    }
+                });
+            });
+
+            renderer.localClippingEnabled = activePlanes.length > 0;
+        }
+
+        function calculateModelBounds() {
+            const box = new THREE.Box3();
+            [...frameObjects, ...pointObjects].forEach(obj => box.expandByObject(obj));
+            
+            modelBounds.minX = box.min.x;
+            modelBounds.maxX = box.max.x;
+            modelBounds.minY = box.min.y;
+            modelBounds.maxY = box.max.y;
+            modelBounds.minZ = box.min.z;
+            modelBounds.maxZ = box.max.z;
+
+            updateClipPlanePosition('xz', 50);
+            updateClipPlanePosition('xy', 50);
+            updateClipPlanePosition('yz', 50);
+        }
+
+        function updateTransparency() {
+            const opacity = 1 - (transparency / 100);
+            frameObjects.forEach(obj => {
+                obj.traverse((child) => {
+                    if (child.material) {
+                        child.material.transparent = transparency > 0;
+                        child.material.opacity = opacity;
+                    }
+                });
+            });
+        }
+
+        function updatePointSize() {
+            const scale = pointSize / 100;
+            pointObjects.forEach(point => {
+                point.scale.set(scale, scale, scale);
+            });
+        }
+
+        function updateLabelSize() {
+            labelSprites.forEach(sprite => {
+                const scale = labelSize / 14;
+                sprite.scale.set(1600 * scale, 400 * scale, 1);  // ✅ Matches bigger canvas!
+            });
+        }
+
+        function toggleViewMode() {
+            show3DSections = !show3DSections;
+            const btn = document.getElementById('view-mode-btn');
+            
+            if (show3DSections) {
+                btn.classList.add('active');
+                btn.textContent = '🗂️ 3D Sections';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '📏 Line View';
+            }
+            
+            if (modelData) {
+                loadModel(modelData);
+                // Force multiple label rotation updates to ensure proper alignment
+                setTimeout(() => {
+                    updateLabelRotations();
+                    setTimeout(() => {
+                        updateLabelRotations();
+                    }, 100);
+                }, 100);
+            }
+        }
+
+        function toggleGrid() {
+            showGrid = !showGrid;
+            gridHelper.visible = showGrid;
+            const btn = document.getElementById('grid-btn');
+            btn.textContent = showGrid ? '⊞ Grid: ON' : '⊞ Grid: OFF';
+        }
+
+        function toggleAxes() {
+            showAxes = !showAxes;
+            axesHelper.visible = showAxes;
+            const btn = document.getElementById('axes-btn');
+            btn.textContent = showAxes ? '📊 Axes: ON' : '📊 Axes: OFF';
+        }
+
+        function togglePoints() {
+            showPoints = !showPoints;
+            pointObjects.forEach(p => p.visible = showPoints);
+            const btn = document.getElementById('points-btn');
+            btn.textContent = showPoints ? '⚫ Points: ON' : '⚫ Points: OFF';
+        }
+
+        function toggleLabels() {
+            showLabels = !showLabels;
+            labelSprites.forEach(label => label.visible = showLabels);
+            const btn = document.getElementById('labels-btn');
+            if (showLabels) {
+                btn.classList.add('active');
+                btn.textContent = '🏷️ Labels: ON';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '🏷️ Labels: OFF';
+            }
+        }
+
+        function toggleColorMode() {
+            uniformColorMode = !uniformColorMode;
+            const btn = document.getElementById('color-mode-btn');
+            
+            if (uniformColorMode) {
+                btn.textContent = '🎨 Uniform Gray';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '🎨 Profile Colors';
+                btn.classList.remove('active');
+            }
+            
+            frameObjects.forEach(obj => {
+                obj.traverse((child) => {
+                    if (child.material && child.userData.originalColor !== undefined) {
+                        const isSelected = selectedObjects.some(selObj => {
+                            if (selObj === obj) return true;
+                            let found = false;
+                            selObj.traverse(c => { if (c === child) found = true; });
+                            return found;
+                        });
+                        
+                        if (!isSelected) {
+                            const displayColor = uniformColorMode ? UNIFORM_COLOR : child.userData.originalColor;
+                            child.material.color.setHex(displayColor);
+                        }
+                    }
+                });
+            });
+        }
+
+        function toggleMeasureMode() {
+            measureMode = !measureMode;
+            const btn = document.getElementById('measure-btn');
+            const info = document.getElementById('measure-info');
+            const container = document.getElementById('canvas-container');
+            
+            if (measureMode) {
+                btn.classList.add('active');
+                info.style.display = 'block';
+                container.classList.add('measure-mode');
+                deselectAll();
+            } else {
+                btn.classList.remove('active');
+                info.style.display = 'none';
+                container.classList.remove('measure-mode');
+                measurePoints = [];
+                measureMarkers.forEach(m => scene.remove(m));
+                measureMarkers = [];
+                if (measureLine) scene.remove(measureLine);
+                document.getElementById('distance-display').style.display = 'none';
+            }
+        }
+
+        function toggleZoom() {
+            zoomEnabled = !zoomEnabled;
+            const btn = document.getElementById('zoom-toggle-btn');
+            if (zoomEnabled) {
+                btn.classList.add('active');
+                btn.textContent = '🔍 Zoom: ON';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '🔍 Zoom: OFF';
+            }
+        }
+
+        function toggleSettings() {
+            const content = document.getElementById('settings-content');
+            content.classList.toggle('open');
+        }
+
+        function changeBackgroundColor(color) {
+            backgroundColor = parseInt(color.replace('#', '0x'));
+            scene.background = new THREE.Color(backgroundColor);
+        }
+
+        function changePointColor(color) {
+            pointColor = parseInt(color.replace('#', '0x'));
+            pointObjects.forEach(point => {
+                if (point.material && !selectedObjects.includes(point)) {
+                    point.material.color.setHex(pointColor);
+                    point.userData.originalColor = pointColor;
+                }
+            });
+        }
+
+        function changeLabelColor(color) {
+            labelColor = color;
+            labelSprites.forEach(sprite => {
+                if (sprite.material && sprite.material.map) {
+                    createLabelTexture(sprite.userData.text, sprite);
+                }
+            });
+        }
+
+        function showTotalWeight() {
+            if (!modelData || !modelData.Frames) {
+                alert('No model loaded');
+                return;
+            }
+
+            let totalWeight = 0;
+            modelData.Frames.forEach(frame => {
+                if (frame.DesignData && !isNaN(frame.DesignData.KgTotal)) {
+                    totalWeight += frame.DesignData.KgTotal;
+                }
+            });
+
+            document.getElementById('total-weight-value').textContent = totalWeight.toFixed(2) + ' kg';
+            document.getElementById('total-weight-display').style.display = 'block';
+
+            setTimeout(() => {
+                document.getElementById('total-weight-display').style.display = 'none';
+            }, 5000);
+        }
+
+        function toggleControlsPanel() {
+            const content = document.getElementById('controls-content');
+            content.classList.toggle('open');
+        }
+
+        function toggleSubsection(id) {
+            const content = document.getElementById(id);
+            const arrow = content.previousElementSibling.querySelector('.arrow');
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        function buildProfileFilter() {
+            const list = document.getElementById('profile-filter-list');
+            const profiles = {};
+            
+            modelData.Frames.forEach(frame => {
+                if (!profiles[frame.ProfileName]) {
+                    profiles[frame.ProfileName] = 0;
+                }
+                profiles[frame.ProfileName]++;
+            });
+
+            let html = '';
+            Object.keys(profiles).sort().forEach(profile => {
+                const checked = !hiddenProfiles.has(profile);
+                const safeId = profile.replace(/[^a-zA-Z0-9]/g, '_');
+                html += `
+                    <div class="filter-item">
+                        <input type="checkbox" id="prof_${safeId}" ${checked ? 'checked' : ''} 
+                               onchange="toggleProfile('${profile.replace(/'/g, "\\'")}')">
+                        <label for="prof_${safeId}">${profile}</label>
+                        <span class="filter-count">(${profiles[profile]})</span>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        function buildGroupFilter() {
+            const list = document.getElementById('group-filter-list');
+            const groups = {};
+            
+            modelData.Frames.forEach(frame => {
+                const group = frame.GroupName || 'All';
+                if (!groups[group]) {
+                    groups[group] = 0;
+                }
+                groups[group]++;
+            });
+
+            let html = '';
+            Object.keys(groups).sort().forEach(group => {
+                const checked = !hiddenGroups.has(group);
+                const safeId = group.replace(/[^a-zA-Z0-9]/g, '_');
+                html += `
+                    <div class="filter-item">
+                        <input type="checkbox" id="grp_${safeId}" ${checked ? 'checked' : ''} 
+                               onchange="toggleGroup('${group.replace(/'/g, "\\'")}')">
+                        <label for="grp_${safeId}">${group}</label>
+                        <span class="filter-count">(${groups[group]})</span>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        function toggleProfile(profileName) {
+            if (hiddenProfiles.has(profileName)) {
+                hiddenProfiles.delete(profileName);
+            } else {
+                hiddenProfiles.add(profileName);
+            }
+            updateVisibility();
+        }
+
+        function toggleGroup(groupName) {
+            if (hiddenGroups.has(groupName)) {
+                hiddenGroups.delete(groupName);
+            } else {
+                hiddenGroups.add(groupName);
+            }
+            updateVisibility();
+        }
+
+        function selectAllProfiles() {
+            hiddenProfiles.clear();
+            document.querySelectorAll('#profile-filter-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+            updateVisibility();
+        }
+
+        function deselectAllProfiles() {
+            Object.keys(profileColorMap).forEach(p => hiddenProfiles.add(p));
+            document.querySelectorAll('#profile-filter-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+            updateVisibility();
+        }
+
+        function selectAllGroups() {
+            hiddenGroups.clear();
+            document.querySelectorAll('#group-filter-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+            updateVisibility();
+        }
+
+        function deselectAllGroups() {
+            const groups = new Set();
+            modelData.Frames.forEach(f => groups.add(f.GroupName || 'All'));
+            groups.forEach(g => hiddenGroups.add(g));
+            document.querySelectorAll('#group-filter-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+            updateVisibility();
+        }
+
+        function updateVisibility() {
+            frameObjects.forEach(obj => {
+                const profile = obj.userData.profile;
+                const group = obj.userData.group || 'All';
+                const visible = !hiddenProfiles.has(profile) && !hiddenGroups.has(group);
+                obj.visible = visible;
+            });
+            
+            labelSprites.forEach(label => {
+                const profile = label.userData.profile;
+                const group = label.userData.group || 'All';
+                const visible = showLabels && !hiddenProfiles.has(profile) && !hiddenGroups.has(group);
+                label.visible = visible;
+            });
+        }
+
+        function resetCamera() {
+            fitCameraToModel();
+        }
+
+        function createLabelTexture(text, sprite) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 1024;  // ✅ BIGGER canvas!
+            canvas.height = 256;  // ✅ More height!
+            
+            // Clear canvas completely
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.fillStyle = 'rgba(0, 0, 0, 0)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Set font FIRST to measure text
+            const fontSize = Math.floor(labelSize * 5);
+            context.font = `bold ${fontSize}px Arial`;
+            
+            // Measure text width to ensure it fits
+            const textMetrics = context.measureText(text);
+            const textWidth = textMetrics.width;
+            
+            // Adjust font size if text is too wide (auto-scaling!)
+            let finalFontSize = fontSize;
+            if (textWidth > canvas.width * 0.9) {
+                finalFontSize = Math.floor((canvas.width * 0.9) / textWidth * fontSize);
+                context.font = `bold ${finalFontSize}px Arial`;
+            }
+            
+            // Add text shadow for readability
+            context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            context.shadowBlur = 12;
+            context.shadowOffsetX = 3;
+            context.shadowOffsetY = 3;
+            
+            context.fillStyle = labelColor;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            // Dispose old texture if exists
+            if (sprite.material.map) {
+                sprite.material.map.dispose();
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            sprite.material.map = texture;
+            sprite.material.needsUpdate = true;
+            
+            // Update sprite scale to match bigger canvas
+            const scale = labelSize / 14;
+            sprite.scale.set(1600 * scale, 400 * scale, 1);
+        }
+
+        function createLabel(text, position, profile, group, start, end) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 1024;  // ✅ BIGGER canvas to fit FULL text!
+            canvas.height = 256;  // ✅ More height for better quality!
+            
+            // Transparent background - no box
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.fillStyle = 'rgba(0, 0, 0, 0)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Set font FIRST to measure text
+            const fontSize = Math.floor(labelSize * 5);
+            context.font = `bold ${fontSize}px Arial`;
+            
+            // Measure text width to ensure it fits
+            const textMetrics = context.measureText(text);
+            const textWidth = textMetrics.width;
+            
+            // Adjust font size if text is too wide (auto-scaling!)
+            let finalFontSize = fontSize;
+            if (textWidth > canvas.width * 0.9) {
+                finalFontSize = Math.floor((canvas.width * 0.9) / textWidth * fontSize);
+                context.font = `bold ${finalFontSize}px Arial`;
+            }
+            
+            // Add text shadow for readability
+            context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            context.shadowBlur = 12;
+            context.shadowOffsetX = 3;
+            context.shadowOffsetY = 3;
+            
+            context.fillStyle = labelColor;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            const material = new THREE.SpriteMaterial({ 
+                map: texture, 
+                depthTest: true,
+                sizeAttenuation: true,
+                transparent: true
+            });
+            material.needsUpdate = true;
+            
+            const sprite = new THREE.Sprite(material);
+            
+            sprite.position.copy(position);
+            const scale = labelSize / 14;
+            sprite.scale.set(1600 * scale, 400 * scale, 1);  // ✅ Scale matches bigger canvas!
+            sprite.visible = showLabels;
+            
+            // Store line direction for alignment
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+            sprite.userData = { text, profile, group, start, end, direction };
+            
+            // Calculate initial rotation immediately
+            calculateLabelRotation(sprite);
+            
+            scene.add(sprite);
+            labelSprites.push(sprite);
+            
+            return sprite;
+        }
+        
+        function calculateLabelRotation(sprite) {
+            if (!sprite.userData.direction) return;
+            
+            // Calculate the vector from camera to sprite
+            const toSprite = new THREE.Vector3().subVectors(sprite.position, camera.position);
+            
+            // Get the line direction
+            const lineDir = sprite.userData.direction.clone();
+            
+            // Project line direction onto the plane perpendicular to camera view
+            const cameraDir = toSprite.clone().normalize();
+            const projectedLine = lineDir.clone().sub(cameraDir.clone().multiplyScalar(lineDir.dot(cameraDir)));
+            projectedLine.normalize();
+            
+            // Get camera's right and up vectors
+            const cameraRight = new THREE.Vector3();
+            const cameraUp = new THREE.Vector3();
+            camera.matrixWorld.extractBasis(cameraRight, cameraUp, new THREE.Vector3());
+            
+            // Calculate angle in screen space
+            const screenX = projectedLine.dot(cameraRight);
+            const screenY = projectedLine.dot(cameraUp);
+            let angle = Math.atan2(screenY, screenX);
+            
+            // Keep text readable - flip if upside down
+            if (angle > Math.PI / 2) {
+                angle -= Math.PI;
+            } else if (angle < -Math.PI / 2) {
+                angle += Math.PI;
+            }
+            
+            sprite.material.rotation = angle;
+        }
+        
+        function updateLabelRotations() {
+            labelSprites.forEach(sprite => {
+                calculateLabelRotation(sprite);
+            });
+        }
+
+        function loadModel(data) {
+            frameObjects.forEach(obj => scene.remove(obj));
+            pointObjects.forEach(obj => scene.remove(obj));
+            
+            // Properly dispose of label materials and textures
+            labelSprites.forEach(label => {
+                if (label.material) {
+                    if (label.material.map) {
+                        label.material.map.dispose();
+                    }
+                    label.material.dispose();
+                }
+                scene.remove(label);
+            });
+            
+            frameObjects = [];
+            pointObjects = [];
+            labelSprites = [];
+            hiddenProfiles.clear();
+            hiddenGroups.clear();
+
+            data.Frames.forEach(frame => {
+                createFrameElement(frame);
+            });
+
+            data.Points.forEach(point => {
+                createPointElement(point);
+            });
+
+            calculateModelBounds();
+            buildProfileFilter();
+            buildGroupFilter();
+            fitCameraToModel();
+            
+            // Update label rotations after a short delay to ensure everything is rendered
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    updateLabelRotations();
+                });
+            });
+        }
+
+        function createFrameElement(frame) {
+            const start = new THREE.Vector3(
+                frame.StartPoint.X * SCALE,
+                frame.StartPoint.Z * SCALE,
+                frame.StartPoint.Y * SCALE
+            );
+            const end = new THREE.Vector3(
+                frame.EndPoint.X * SCALE,
+                frame.EndPoint.Z * SCALE,
+                frame.EndPoint.Y * SCALE
+            );
+            const length = start.distanceTo(end) / SCALE;
+
+            let frameObj;
+
+            if (show3DSections && ((frame.SectionProps && frame.SectionProps.Type !== 'UNKNOWN') || frame.IsNonPrismatic)) {
+                if (frame.IsNonPrismatic) {
+                    frameObj = createNonPrismaticSection(frame, start, end);
+                } else {
+                    frameObj = create3DSection(frame, start, end);
+                }
+            } else {
+                frameObj = createLineElement(frame, start, end);
+                
+                // Create label for line view
+                if (!show3DSections) {
+                    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                    createLabel(frame.ProfileName, midpoint, frame.ProfileName, frame.GroupName || 'All', start, end);
+                }
+            }
+
+            frameObj.userData = {
+                type: 'frame',
+                name: frame.Name,
+                profile: frame.ProfileName,
+                group: frame.GroupName || 'All',
+                sectionType: frame.IsNonPrismatic ? 'Non-Prismatic' : (frame.SectionProps ? frame.SectionProps.Type : 'UNKNOWN'),
+                point1: frame.Point1Name,
+                point2: frame.Point2Name,
+                length: length,
+                sectionProps: frame.SectionProps,
+                isNonPrismatic: frame.IsNonPrismatic,
+                originalColor: getColorForProfile(frame.ProfileName),
+                designData: frame.DesignData || null
+            };
+
+            scene.add(frameObj);
+            frameObjects.push(frameObj);
+        }
+
+        function createLineElement(frame, start, end) {
+            const points = [start, end];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const originalColor = getColorForProfile(frame.ProfileName);
+            const displayColor = uniformColorMode ? UNIFORM_COLOR : originalColor;
+            const material = new THREE.LineBasicMaterial({ color: displayColor, linewidth: 2 });
+            const line = new THREE.Line(geometry, material);
+            line.userData.originalColor = originalColor;
+            return line;
+        }
+
+        function createNonPrismaticSection(frame, start, end) {
+            const group = new THREE.Group();
+            const originalColor = getColorForProfile(frame.ProfileName);
+            const displayColor = uniformColorMode ? UNIFORM_COLOR : originalColor;
+            const segments = frame.NonPrismaticSegments;
+            
+            if (!segments || segments.length === 0) {
+                return createLineElement(frame, start, end);
+            }
+
+            const totalLength = start.distanceTo(end);
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+            
+            // Create proper rotation matrix like 3D sections
+            const up = new THREE.Vector3(0, 1, 0);
+            if (Math.abs(direction.y) > 0.99) {
+                up.set(1, 0, 0);
+            }
+            
+            const zAxis = direction;
+            const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+            const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+            
+            const matrix = new THREE.Matrix4();
+            matrix.makeBasis(xAxis, yAxis, zAxis);
+            const quaternion = new THREE.Quaternion();
+            quaternion.setFromRotationMatrix(matrix);
+            
+            segments.forEach(segment => {
+                const segStartPos = segment.RelativeStart * totalLength;
+                const segLength = segment.AbsoluteLength * SCALE;
+                
+                const segStart = start.clone().add(direction.clone().multiplyScalar(segStartPos));
+                
+                const mesh = createTaperedMesh(
+                    segment.StartSection, 
+                    segment.EndSection, 
+                    segLength, 
+                    displayColor
+                );
+                
+                mesh.userData.originalColor = originalColor;
+                mesh.position.copy(segStart);
+                mesh.quaternion.copy(quaternion);
+                
+                group.add(mesh);
+            });
+            
+            return group;
+        }
+
+        function createTaperedMesh(startProps, endProps, length, color) {
+            const divisions = 10;
+            const vertices = [];
+            const indices = [];
+            
+            for (let i = 0; i <= divisions; i++) {
+                const t = i / divisions;
+                const z = t * length;
+                
+                const sectionVerts = getIBeamVertices(startProps, endProps, t, z);
+                vertices.push(...sectionVerts);
+                
+                if (i > 0) {
+                    const prevOffset = (i - 1) * 12;
+                    const currOffset = i * 12;
+                    
+                    for (let j = 0; j < 12; j++) {
+                        const next = (j + 1) % 12;
+                        indices.push(prevOffset + j, currOffset + j, prevOffset + next);
+                        indices.push(currOffset + j, currOffset + next, prevOffset + next);
+                    }
+                }
+            }
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            
+            const material = new THREE.MeshPhongMaterial({ 
+                color: color,
+                shininess: 60,
+                side: THREE.DoubleSide
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            return mesh;
+        }
+
+        function getIBeamVertices(startProps, endProps, t, z) {
+            const d = (startProps.Depth * (1 - t) + endProps.Depth * t) * SCALE;
+            const w = (startProps.Width * (1 - t) + endProps.Width * t) * SCALE;
+            const tf = (startProps.FlangeThickness * (1 - t) + endProps.FlangeThickness * t) * SCALE;
+            const tw = (startProps.WebThickness * (1 - t) + endProps.WebThickness * t) * SCALE;
+            const wb = ((startProps.BottomWidth || startProps.Width) * (1 - t) + (endProps.BottomWidth || endProps.Width) * t) * SCALE;
+            const tfb = ((startProps.BottomFlangeThickness || startProps.FlangeThickness) * (1 - t) + (endProps.BottomFlangeThickness || endProps.FlangeThickness) * t) * SCALE;
+            
+            const halfD = d / 2;
+            const halfW = w / 2;
+            const halfWb = wb / 2;
+            const halfTw = tw / 2;
+            
+            return [
+                -halfW, halfD, z,
+                halfW, halfD, z,
+                halfW, halfD - tf, z,
+                halfTw, halfD - tf, z,
+                halfTw, -halfD + tfb, z,
+                halfWb, -halfD + tfb, z,
+                halfWb, -halfD, z,
+                -halfWb, -halfD, z,
+                -halfWb, -halfD + tfb, z,
+                -halfTw, -halfD + tfb, z,
+                -halfTw, halfD - tf, z,
+                -halfW, halfD - tf, z
+            ];
+        }
+
+        function create3DSection(frame, start, end) {
+            const props = frame.SectionProps;
+            const group = new THREE.Group();
+            const originalColor = getColorForProfile(frame.ProfileName);
+            const displayColor = uniformColorMode ? UNIFORM_COLOR : originalColor;
+
+            let shape;
+
+            switch (props.Type) {
+                case 'I':
+                    shape = createIBeamShape(props);
+                    break;
+                case 'BOX':
+                    shape = createBoxShape(props);
+                    break;
+                case 'PIPE':
+                    shape = createPipeShape(props);
+                    break;
+                case 'CIRCLE':
+                    shape = createCircleShape(props);
+                    break;
+                case 'RECTANGLE':
+                    shape = createRectangleShape(props);
+                    break;
+                case 'ANGLE':
+                    shape = createAngleShape(props);
+                    break;
+                case 'CHANNEL':
+                    shape = createChannelShape(props);
+                    break;
+                case 'TEE':
+                    shape = createTeeShape(props);
+                    break;
+                default:
+                    return createLineElement(frame, start, end);
+            }
+
+            if (!shape) return createLineElement(frame, start, end);
+
+            const length = start.distanceTo(end);
+            const extrudeSettings = {
+                steps: 1,
+                depth: length,
+                bevelEnabled: false
+            };
+
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: displayColor,
+                shininess: 60,
+                side: THREE.DoubleSide
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.userData.originalColor = originalColor;
+
+            // FIXED: Proper orientation without rotation issues
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+            
+            // Position at start
+            mesh.position.copy(start);
+            
+            // Create rotation to align Z-axis with the direction vector
+            const up = new THREE.Vector3(0, 1, 0);
+            const quaternion = new THREE.Quaternion();
+            
+            // If direction is vertical (parallel to Y), use different up vector
+            if (Math.abs(direction.y) > 0.99) {
+                up.set(0, 0, 1);
+            }
+            
+            // Create a rotation matrix
+            const zAxis = direction;
+            const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+            const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+            
+            const matrix = new THREE.Matrix4();
+            matrix.makeBasis(xAxis, yAxis, zAxis);
+            quaternion.setFromRotationMatrix(matrix);
+            
+            mesh.quaternion.copy(quaternion);
+
+            group.add(mesh);
+            return group;
+        }
+
+        function createIBeamShape(props) {
+            const shape = new THREE.Shape();
+            const d = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            const tf = props.FlangeThickness * SCALE;
+            const tw = props.WebThickness * SCALE;
+            const wb = (props.BottomWidth || w) * SCALE;
+            const tfb = (props.BottomFlangeThickness || tf) * SCALE;
+
+            const halfD = d / 2;
+            const halfW = w / 2;
+            const halfWb = wb / 2;
+            const halfTw = tw / 2;
+
+            shape.moveTo(-halfW, halfD);
+            shape.lineTo(halfW, halfD);
+            shape.lineTo(halfW, halfD - tf);
+            shape.lineTo(halfTw, halfD - tf);
+            shape.lineTo(halfTw, -halfD + tfb);
+            shape.lineTo(halfWb, -halfD + tfb);
+            shape.lineTo(halfWb, -halfD);
+            shape.lineTo(-halfWb, -halfD);
+            shape.lineTo(-halfWb, -halfD + tfb);
+            shape.lineTo(-halfTw, -halfD + tfb);
+            shape.lineTo(-halfTw, halfD - tf);
+            shape.lineTo(-halfW, halfD - tf);
+            shape.lineTo(-halfW, halfD);
+
+            return shape;
+        }
+
+        function createBoxShape(props) {
+            const shape = new THREE.Shape();
+            const h = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            const t = props.FlangeThickness * SCALE;
+
+            const halfH = h / 2;
+            const halfW = w / 2;
+
+            shape.moveTo(-halfW, -halfH);
+            shape.lineTo(halfW, -halfH);
+            shape.lineTo(halfW, halfH);
+            shape.lineTo(-halfW, halfH);
+            shape.lineTo(-halfW, -halfH);
+
+            const hole = new THREE.Path();
+            hole.moveTo(-halfW + t, -halfH + t);
+            hole.lineTo(-halfW + t, halfH - t);
+            hole.lineTo(halfW - t, halfH - t);
+            hole.lineTo(halfW - t, -halfH + t);
+            hole.lineTo(-halfW + t, -halfH + t);
+            
+            shape.holes.push(hole);
+            return shape;
+        }
+
+        function createPipeShape(props) {
+            const r = (props.Diameter / 2) * SCALE;
+            const t = props.Thickness * SCALE;
+
+            const shape = new THREE.Shape();
+            shape.absarc(0, 0, r, 0, Math.PI * 2, false);
+
+            const hole = new THREE.Path();
+            hole.absarc(0, 0, r - t, 0, Math.PI * 2, true);
+            shape.holes.push(hole);
+
+            return shape;
+        }
+
+        function createCircleShape(props) {
+            const r = (props.Diameter / 2) * SCALE;
+            const shape = new THREE.Shape();
+            shape.absarc(0, 0, r, 0, Math.PI * 2, false);
+            return shape;
+        }
+
+        function createRectangleShape(props) {
+            const shape = new THREE.Shape();
+            const h = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            
+            shape.moveTo(-w / 2, -h / 2);
+            shape.lineTo(w / 2, -h / 2);
+            shape.lineTo(w / 2, h / 2);
+            shape.lineTo(-w / 2, h / 2);
+            shape.lineTo(-w / 2, -h / 2);
+            
+            return shape;
+        }
+
+        function createAngleShape(props) {
+            const shape = new THREE.Shape();
+            const h = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            const tv = props.FlangeThickness * SCALE;
+            const th = props.WebThickness * SCALE;
+
+            shape.moveTo(0, 0);
+            shape.lineTo(w, 0);
+            shape.lineTo(w, th);
+            shape.lineTo(tv, th);
+            shape.lineTo(tv, h);
+            shape.lineTo(0, h);
+            shape.lineTo(0, 0);
+
+            return shape;
+        }
+
+        function createChannelShape(props) {
+            const shape = new THREE.Shape();
+            const h = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            const tf = props.FlangeThickness * SCALE;
+            const tw = props.WebThickness * SCALE;
+
+            const halfH = h / 2;
+
+            shape.moveTo(0, -halfH);
+            shape.lineTo(w, -halfH);
+            shape.lineTo(w, -halfH + tf);
+            shape.lineTo(tw, -halfH + tf);
+            shape.lineTo(tw, halfH - tf);
+            shape.lineTo(w, halfH - tf);
+            shape.lineTo(w, halfH);
+            shape.lineTo(0, halfH);
+            shape.lineTo(0, -halfH);
+
+            return shape;
+        }
+
+        function createTeeShape(props) {
+            const shape = new THREE.Shape();
+            const h = props.Depth * SCALE;
+            const w = props.Width * SCALE;
+            const tf = props.FlangeThickness * SCALE;
+            const tw = props.WebThickness * SCALE;
+
+            const halfW = w / 2;
+            const halfTw = tw / 2;
+
+            shape.moveTo(-halfW, h);
+            shape.lineTo(halfW, h);
+            shape.lineTo(halfW, h - tf);
+            shape.lineTo(halfTw, h - tf);
+            shape.lineTo(halfTw, 0);
+            shape.lineTo(-halfTw, 0);
+            shape.lineTo(-halfTw, h - tf);
+            shape.lineTo(-halfW, h - tf);
+            shape.lineTo(-halfW, h);
+
+            return shape;
+        }
+
+        function createPointElement(point) {
+            const geometry = new THREE.SphereGeometry(100, 16, 16);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: pointColor, 
+                shininess: 80 
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            
+            sphere.position.set(
+                point.Coordinate.X * SCALE,
+                point.Coordinate.Z * SCALE,
+                point.Coordinate.Y * SCALE
+            );
+
+            sphere.userData = {
+                type: 'point',
+                name: point.Name,
+                x: point.Coordinate.X,
+                y: point.Coordinate.Y,
+                z: point.Coordinate.Z,
+                originalColor: pointColor
+            };
+
+            scene.add(sphere);
+            pointObjects.push(sphere);
+        }
+
+        function fitCameraToModel() {
+            if (frameObjects.length === 0 && pointObjects.length === 0) return;
+
+            const box = new THREE.Box3();
+            [...frameObjects, ...pointObjects].forEach(obj => box.expandByObject(obj));
+
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            cameraTarget.copy(center);
+            cameraDistance = maxDim * 2;
+            cameraTheta = Math.PI / 4;
+            cameraPhi = Math.PI / 4;
+            
+            updateCameraPosition();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateLabelRotations();
+            renderer.render(scene, camera);
+        }
+
+        initScene();
+    </script>
+</body>
+</html>
